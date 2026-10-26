@@ -1,2 +1,6 @@
-// Placeholders for mock data
-export {}
+export { categories } from './categories'
+export { channels } from './channels'
+export { videos } from './videos'
+export { comments } from './comments'
+export { initialPlaylists } from './playlists'
+export { mockUser } from './user'
