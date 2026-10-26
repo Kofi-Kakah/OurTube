@@ -2,9 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ourtube</title>
+    <title>OurTube</title>
+    <script>
+      (function () {
+        try {
+          const stored = localStorage.getItem('ourtube-theme-storage')
+          let theme = 'system'
+          if (stored) {
+            const parsed = JSON.parse(stored)
+            if (parsed && parsed.state && parsed.state.theme) {
+              theme = parsed.state.theme
+            }
+          }
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const isDark = theme === 'dark' || (theme === 'system' && prefersDark)
+          if (isDark) {
+            document.documentElement.setAttribute('data-theme', 'dark')
+            document.documentElement.classList.add('dark')
+          } else {
+            document.documentElement.setAttribute('data-theme', 'light')
+            document.documentElement.classList.remove('dark')
+          }
+        } catch (_) {
+          // ignore storage read errors
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

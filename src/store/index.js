@@ -1,2 +1,1 @@
-// Placeholders for zustand stores
-export {}
+export { useThemeStore } from './themeStore'

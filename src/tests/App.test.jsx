@@ -1,17 +1,25 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import App from '@/app/App'
 
-describe('App Routing', () => {
-  it('renders Home page placeholder at root path', async () => {
+describe('App & AppShell Integration', () => {
+  it('renders AppShell navbar with logo and primary navigation', async () => {
     window.history.pushState({}, '', '/')
     render(<App />)
+
     expect(
       await screen.findByRole('heading', { name: /home/i })
     ).toBeInTheDocument()
+    expect(screen.getByLabelText(/ourtube home/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: /primary navigation/i })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', { name: /mobile bottom navigation/i })
+    ).toBeInTheDocument()
   })
 
-  it('renders Explore page placeholder at /explore', async () => {
+  it('navigates to Explore and renders Explore placeholder', async () => {
     window.history.pushState({}, '', '/explore')
     render(<App />)
     expect(
@@ -19,19 +27,29 @@ describe('App Routing', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders Watch page placeholder at /watch/123', async () => {
-    window.history.pushState({}, '', '/watch/123')
+  it('navigates to Subscriptions and renders Subscriptions placeholder', async () => {
+    window.history.pushState({}, '', '/subscriptions')
     render(<App />)
     expect(
-      await screen.findByRole('heading', { name: /watch/i })
+      await screen.findByRole('heading', { name: /subscriptions/i })
     ).toBeInTheDocument()
   })
 
-  it('renders 404 Not Found at non-existent route', async () => {
-    window.history.pushState({}, '', '/non-existent-route-path')
+  it('toggles theme via Navbar dropdown', async () => {
+    window.history.pushState({}, '', '/')
     render(<App />)
+
     expect(
-      await screen.findByRole('heading', { name: /404 not found/i })
+      await screen.findByRole('heading', { name: /home/i })
     ).toBeInTheDocument()
+
+    const themeBtn = screen.getByLabelText(/current theme/i)
+    fireEvent.click(themeBtn)
+
+    const darkOption = await screen.findByRole('menuitem', { name: /dark/i })
+    fireEvent.click(darkOption)
+
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 })

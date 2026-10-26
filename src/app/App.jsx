@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AppShell } from '@/components/layout'
+import { ToastProvider, Spinner } from '@/components/common'
 
 const Home = lazy(() => import('@/pages/Home'))
 const Explore = lazy(() => import('@/pages/Explore'))
@@ -15,22 +17,35 @@ const NotFound = lazy(() => import('@/pages/NotFound'))
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<div>Loading...</div>}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/explore" element={<Explore />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/watch/:videoId" element={<Watch />} />
-          <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/liked" element={<LikedVideos />} />
-          <Route path="/playlists" element={<Playlists />} />
-          <Route path="/playlists/:playlistId" element={<PlaylistDetail />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+              <Spinner size="lg" aria-label="Loading page" />
+            </div>
+          }
+        >
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/watch/:videoId" element={<Watch />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/liked" element={<LikedVideos />} />
+              <Route path="/playlists" element={<Playlists />} />
+              <Route
+                path="/playlists/:playlistId"
+                element={<PlaylistDetail />}
+              />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </ToastProvider>
   )
 }

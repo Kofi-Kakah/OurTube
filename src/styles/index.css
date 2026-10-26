@@ -1,6 +1,28 @@
 @import 'tailwindcss';
+@import './tokens.css';
 
-:root {
+@theme {
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-surface-elevated);
+  --color-border-subtle: var(--border-color);
+  --color-text-main: var(--text-primary);
+  --color-text-muted: var(--text-secondary);
+  --color-brand: var(--accent);
+  --color-brand-hover: var(--accent-hover);
+  --color-danger: var(--danger);
+  --color-overlay: var(--overlay);
+  --color-skeleton: var(--skeleton);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
   font-family:
     system-ui,
     -apple-system,
@@ -11,5 +33,41 @@
     Ubuntu,
     Cantarell,
     sans-serif;
-  color-scheme: light dark;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Shimmer animation for Skeleton */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
 }

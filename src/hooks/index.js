@@ -1,2 +1,1 @@
-// Placeholders for custom hooks
-export {}
+export { useToast } from './useToast'
