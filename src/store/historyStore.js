@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+const calculatePercentage = (progress, duration) => {
+  if (!duration || !progress || progress <= 0) return 0
+  return Math.min(100, Math.round((progress / duration) * 100))
+}
+
 export const useHistoryStore = create(
   persist(
     (set, get) => ({
@@ -10,12 +15,14 @@ export const useHistoryStore = create(
           watchedAt: '2026-09-20T15:00:00Z',
           progressSeconds: 420,
           durationSeconds: 1425,
+          percentage: 29,
         },
         {
           videoId: 'vid-12',
           watchedAt: '2026-09-19T22:00:00Z',
           progressSeconds: 1200,
           durationSeconds: 3600,
+          percentage: 33,
         },
       ],
       isPaused: false,
@@ -24,6 +31,8 @@ export const useHistoryStore = create(
         if (get().isPaused) return
 
         const watchedAt = new Date().toISOString()
+        const percentage = calculatePercentage(progressSeconds, durationSeconds)
+
         set((state) => {
           const filtered = state.entries.filter((e) => e.videoId !== videoId)
           return {
@@ -33,6 +42,7 @@ export const useHistoryStore = create(
                 watchedAt,
                 progressSeconds,
                 durationSeconds,
+                percentage,
               },
               ...filtered,
             ],
@@ -47,6 +57,10 @@ export const useHistoryStore = create(
         const isCompleted =
           durationSeconds > 0 && progressSeconds / durationSeconds >= 0.95
         const effectiveProgress = isCompleted ? 0 : progressSeconds
+        const percentage = calculatePercentage(
+          effectiveProgress,
+          durationSeconds
+        )
 
         set((state) => {
           const existingIndex = state.entries.findIndex(
@@ -57,6 +71,7 @@ export const useHistoryStore = create(
             watchedAt: new Date().toISOString(),
             progressSeconds: effectiveProgress,
             durationSeconds: durationSeconds || 0,
+            percentage,
           }
 
           if (existingIndex >= 0) {
@@ -85,18 +100,10 @@ export const useHistoryStore = create(
 
       getProgress: (videoId) => {
         const entry = get().entries.find((e) => e.videoId === videoId)
-        if (!entry || !entry.durationSeconds || entry.progressSeconds <= 0) {
+        if (!entry || !entry.percentage || entry.percentage <= 0) {
           return null
         }
-        const percentage = Math.min(
-          100,
-          Math.round((entry.progressSeconds / entry.durationSeconds) * 100)
-        )
-        return {
-          progressSeconds: entry.progressSeconds,
-          durationSeconds: entry.durationSeconds,
-          percentage,
-        }
+        return entry
       },
     }),
     {
