@@ -19,11 +19,11 @@ describe('App & AppShell Integration', () => {
     ).toBeInTheDocument()
   })
 
-  it('navigates to Explore and renders Explore placeholder', async () => {
+  it('navigates to Explore and renders the Explore page', async () => {
     window.history.pushState({}, '', '/explore')
     render(<App />)
     expect(
-      await screen.findByRole('heading', { name: /explore/i })
+      await screen.findByRole('heading', { name: /trending/i })
     ).toBeInTheDocument()
   })
 

@@ -58,6 +58,17 @@ body {
   }
 }
 
+/* Hide scrollbars while keeping scroll functionality */
+.no-scrollbar,
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Shimmer animation for Skeleton */
 @keyframes shimmer {
   0% {

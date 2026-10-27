@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { getVideos, getCategories } from '@/services'
-import { CategoryChips, VideoGrid } from '@/components/video'
+import { CategoryChips, VideoGrid, VideoCardSkeleton } from '@/components/video'
 import { EmptyState, Button } from '@/components/common'
-import { AlertCircle, Film } from 'lucide-react'
+import { useInfiniteScroll, useScrollRestoration } from '@/hooks'
+import { AlertCircle, Film, RefreshCw } from 'lucide-react'
 
 export default function Home() {
+  const [searchParams] = useSearchParams()
+  const urlCategory = searchParams.get('category') || 'All'
   const [categories, setCategories] = useState(['All'])
-  const [selectedCategory, setSelectedCategory] = useState('All')
-  const [videos, setVideos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [selectedCategory, setSelectedCategory] = useState(urlCategory)
 
   // Fetch categories once on mount
   useEffect(() => {
@@ -29,52 +29,42 @@ export default function Home() {
     }
   }, [])
 
-  // Fetch Page 1 videos when category or refreshKey changes
-  useEffect(() => {
-    let ignore = false
+  // Infinite scroll data fetcher
+  const fetchVideosPage = useCallback(
+    async (page) => {
+      return getVideos({
+        page,
+        limit: 12,
+        category: selectedCategory,
+      })
+    },
+    [selectedCategory]
+  )
 
-    async function fetchVideos() {
-      try {
-        const response = await getVideos({
-          page: 1,
-          limit: 16,
-          category: selectedCategory,
-        })
-        if (!ignore) {
-          setVideos(response.items || [])
-          setLoading(false)
-        }
-      } catch (err) {
-        if (!ignore) {
-          setError(err?.message || 'Failed to load videos. Please try again.')
-          setLoading(false)
-        }
-      }
-    }
+  const {
+    items: videos,
+    hasMore,
+    isLoading,
+    isLoadingMore,
+    error,
+    errorMore,
+    sentinelRef,
+    retry,
+  } = useInfiniteScroll({
+    fetchFn: fetchVideosPage,
+    dependencies: [selectedCategory],
+  })
 
-    fetchVideos()
-
-    return () => {
-      ignore = true
-    }
-  }, [selectedCategory, refreshKey])
+  useScrollRestoration(!isLoading && videos.length > 0)
 
   const handleCategorySelect = (category) => {
     if (category !== selectedCategory) {
-      setLoading(true)
-      setError(null)
       setSelectedCategory(category)
     }
   }
 
-  const handleRetry = () => {
-    setLoading(true)
-    setError(null)
-    setRefreshKey((k) => k + 1)
-  }
-
   return (
-    <div className="flex flex-col gap-6 w-full">
+    <div className="flex flex-col gap-6 w-full pb-8">
       <h1 className="sr-only">Home</h1>
 
       {/* Category Chips Bar */}
@@ -84,32 +74,34 @@ export default function Home() {
         onSelectCategory={handleCategorySelect}
       />
 
-      {/* Main Content UX States */}
-      {loading ? (
-        <VideoGrid loading={true} skeletonCount={16} />
+      {/* UX State: Initial Loading */}
+      {isLoading ? (
+        <VideoGrid loading={true} skeletonCount={12} />
       ) : error ? (
+        /* UX State: Initial Error */
         <div className="py-16">
           <EmptyState
             icon={<AlertCircle className="w-8 h-8 text-[var(--danger)]" />}
-            title="Something went wrong"
+            title="Failed to load videos"
             description={error}
             action={
-              <Button onClick={handleRetry} variant="primary">
+              <Button onClick={retry} variant="primary">
                 Try again
               </Button>
             }
           />
         </div>
       ) : videos.length === 0 ? (
+        /* UX State: Empty */
         <div className="py-16">
           <EmptyState
             icon={<Film className="w-8 h-8 text-[var(--text-secondary)]" />}
             title="No videos found"
-            description={`There are currently no videos available under the "${selectedCategory}" category.`}
+            description={`There are currently no videos available in "${selectedCategory}".`}
             action={
               selectedCategory !== 'All' ? (
                 <Button
-                  onClick={() => handleCategorySelect('All')}
+                  onClick={() => setSelectedCategory('All')}
                   variant="outline"
                 >
                   View All Videos
@@ -119,7 +111,55 @@ export default function Home() {
           />
         </div>
       ) : (
-        <VideoGrid videos={videos} />
+        /* UX State: Success Video Feed */
+        <div className="flex flex-col gap-8">
+          <VideoGrid videos={videos} />
+
+          {/* Loading More Indicator (Inline Skeleton Row) */}
+          {isLoadingMore && (
+            <div
+              aria-label="Loading more videos"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6"
+            >
+              {Array.from({ length: 4 }).map((_, i) => (
+                <VideoCardSkeleton key={`loading-more-${i}`} />
+              ))}
+            </div>
+          )}
+
+          {/* Error More State with Inline Retry */}
+          {errorMore && (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 p-4 rounded-2xl bg-[var(--bg-surface-elevated)] border border-[var(--border-color)] max-w-lg mx-auto text-center">
+              <span className="text-sm text-[var(--text-secondary)]">
+                {errorMore}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={retry}
+                startIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+
+          {/* End of Feed Message */}
+          {!hasMore && (
+            <div className="flex flex-col items-center justify-center py-8 text-center border-t border-[var(--border-color)] mt-4">
+              <p className="text-sm font-medium text-[var(--text-secondary)]">
+                You&apos;ve reached the end of the feed
+              </p>
+            </div>
+          )}
+
+          {/* Infinite Scroll Intersection Sentinel */}
+          <div
+            ref={sentinelRef}
+            className="h-4 w-full pointer-events-none"
+            aria-hidden="true"
+          />
+        </div>
       )}
     </div>
   )

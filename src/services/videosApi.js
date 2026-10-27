@@ -1,4 +1,4 @@
-import { videos, categories } from '@/data'
+import { videos, categories, channels } from '@/data'
 import { simulateNetwork, paginate } from './apiClient'
 
 /**
@@ -155,4 +155,36 @@ export async function getRecommended(
 export async function getCategories() {
   await simulateNetwork({ minMs: 50, maxMs: 150 })
   return [...categories]
+}
+
+/**
+ * Returns search suggestions (videos matching the query by title or tag).
+ * Local in-memory read routed through the service layer; no artificial latency
+ * so the typeahead stays responsive behind the 300 ms input debounce.
+ * @param {Object} options
+ * @param {string} options.q
+ * @param {number} [options.limit=8]
+ * @returns {Promise<Array<{type:'video', id, title, thumbnail, channelId, channelName}>>}
+ */
+export async function getSearchSuggestions({ q, limit = 8 } = {}) {
+  const query = q.trim().toLowerCase()
+  if (!query) return []
+
+  const matched = videos.filter((v) => {
+    const matchTitle = v.title.toLowerCase().includes(query)
+    const matchTag = v.tags.some((tag) => tag.toLowerCase().includes(query))
+    return matchTitle || matchTag
+  })
+
+  return matched
+    .slice(0, limit)
+    .map((v) => ({
+      type: 'video',
+      id: v.id,
+      title: v.title,
+      thumbnail: v.thumbnail,
+      channelId: v.channelId,
+      channelName:
+        (channels.find((c) => c.id === v.channelId) || {}).name || 'Creator',
+    }))
 }
