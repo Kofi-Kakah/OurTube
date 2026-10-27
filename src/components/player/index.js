@@ -1,2 +1,1 @@
-// Placeholders for player components
-export {}
+export { default as VideoPlayer } from './VideoPlayer'

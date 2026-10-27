@@ -1,8 +1,28 @@
 import { comments as initialComments } from '@/data'
 import { simulateNetwork, paginate } from './apiClient'
 
-// In-memory comments store seeded from mock data
-let commentsStore = [...initialComments]
+const STORAGE_KEY = 'ourtube-comments'
+
+const loadComments = () => {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // Ignore localStorage read errors; fall back to mock data.
+  }
+  return [...initialComments]
+}
+
+const saveComments = () => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(commentsStore))
+  } catch {
+    // Ignore localStorage write errors (e.g. quota exceeded).
+  }
+}
+
+// In-memory comments store seeded from mock data and persisted to localStorage
+let commentsStore = loadComments()
 
 /**
  * Fetches comments for a specific video
@@ -53,6 +73,7 @@ export async function addComment({
   }
 
   commentsStore.unshift(newComment)
+  saveComments()
   return { ...newComment }
 }
 
@@ -64,6 +85,7 @@ export async function deleteComment(commentId) {
   commentsStore = commentsStore.filter(
     (c) => c.id !== commentId && c.parentId !== commentId
   )
+  saveComments()
   return { success: true }
 }
 
@@ -75,6 +97,7 @@ export async function likeComment(commentId, increment = true) {
   const comment = commentsStore.find((c) => c.id === commentId)
   if (comment) {
     comment.likesCount = Math.max(0, comment.likesCount + (increment ? 1 : -1))
+    saveComments()
     return { ...comment }
   }
   return null
