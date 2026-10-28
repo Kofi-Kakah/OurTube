@@ -1,116 +1,165 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import PropTypes from 'prop-types'
+import { AlertCircle, RefreshCw } from 'lucide-react'
 import { Spinner } from '@/components/common'
+import { useVideoPlayer } from '@/hooks'
+import BigPlayButton from './BigPlayButton'
+import Controls from './Controls'
 
 /**
- * Native `<video controls>` player (custom controls come in Phase 11).
- * Renders all available source qualities as `<source>` elements so the
- * browser can pick a playable one. Shows a loading scrim and error state.
+ * Custom video player (Phase 11). Replaces native `<video controls>` with a
+ * custom, accessible, always-dark-themed control overlay.
+ *
+ * Props mirror the previous native-player interface so Watch.jsx keeps working:
+ * video, autoPlay, onPlay, onPause, onTimeUpdate, onEnded, onSeeked, videoRef,
+ * plus onWaiting and onError.
+ *
+ * Progress tracking (Phase 8) continues to work: Watch passes callbacks that
+ * read currentTime/duration from the exposed video ref.
  */
 export default function VideoPlayer({
   video,
   autoPlay = false,
+  videoRef,
   onPlay,
   onPause,
   onTimeUpdate,
   onEnded,
   onSeeked,
   onWaiting,
-  videoRef,
+  onError,
 }) {
-  const videoElRef = useRef(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const {
+    elRef,
+    containerRef,
+    state,
+    setHover,
+    togglePlay,
+    seek,
+    setVolume,
+    toggleMute,
+    toggleFullscreen,
+    toggleTheater,
+    retry,
+  } = useVideoPlayer({
+    video,
+    autoPlay,
+    videoRef,
+    onPlay,
+    onPause,
+    onTimeUpdate,
+    onEnded,
+    onSeeked,
+    onWaiting,
+    onError,
+  })
 
-  const handleLoaded = useCallback(() => setIsLoading(false), [])
-  const handleError = useCallback(() => {
-    setIsLoading(false)
-    setError('Unable to play this video. Please try again later.')
-  }, [])
+  const {
+    isPlaying,
+    isWaiting,
+    currentTime,
+    duration,
+    buffered,
+    volume,
+    muted,
+    error,
+    controlsVisible,
+    showBigPlay,
+    isTheater,
+    isFullscreen,
+  } = state
 
-  // Expose the video element to the parent (e.g. for resume seeking)
-  useEffect(() => {
-    if (videoRef && typeof videoRef === 'function') {
-      videoRef(videoElRef.current)
-    }
-  }, [videoRef])
-
-  // Re-load the video source when the video changes and clean up on unmount
-  useEffect(() => {
-    const videoEl = videoElRef.current
-    if (!videoEl) return
-    videoEl.load()
-    return () => {
-      videoEl.pause()
-      videoEl.src = ''
-      videoEl.load()
-    }
-  }, [video?.id])
+  const showControls = controlsVisible || !isPlaying || isWaiting
 
   const handleRetry = useCallback(() => {
-    setError(null)
-    setIsLoading(true)
-    videoElRef.current?.load()
+    retry()
+  }, [retry])
+
+  const handleDragChange = useCallback(() => {
+    // scrubbing suppression is handled inside the hook
   }, [])
+
+  if (error) {
+    return (
+      <div
+        ref={containerRef}
+        className="w-full aspect-video bg-[var(--bg-base)] rounded-2xl overflow-hidden relative flex flex-col items-center justify-center p-6 text-center"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        role="alert"
+        aria-live="polite"
+      >
+        <AlertCircle className="w-10 h-10 text-[var(--danger)] mb-3" />
+        <p className="text-sm text-[var(--text-secondary)] mb-3">
+          Unable to play this video. Please try again later.
+        </p>
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="flex items-center gap-1.5 text-sm text-[var(--accent)] hover:underline"
+        >
+          <RefreshCw className="w-4 h-4" /> Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div
-      className="w-full aspect-video bg-[var(--bg-surface-elevated)] rounded-2xl overflow-hidden relative"
+      ref={containerRef}
+      className={`w-full aspect-video rounded-2xl overflow-hidden relative bg-black ${
+        isTheater ? 'mx-auto max-w-[92vw]' : ''
+      }`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
     >
-      {error ? (
-        <div
-          className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--bg-base)] p-6 text-center"
-          role="alert"
-          aria-live="polite"
-        >
-          <p className="text-sm text-[var(--text-secondary)] mb-3">
-            {error}
-          </p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="text-sm text-[var(--accent)] hover:underline"
-          >
-            Retry
-          </button>
+      <video
+        ref={elRef}
+        playsInline
+        preload="metadata"
+        poster={video.thumbnail}
+        className="w-full h-full block"
+      >
+        {video.sources?.map((source) => (
+          <source
+            key={source.quality}
+            src={source.url}
+            type={source.type}
+            data-quality={source.quality}
+          />
+        ))}
+        Your browser does not support the video tag.
+      </video>
+
+      {isWaiting && !error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 z-10">
+          <Spinner size="lg" aria-label="Loading video" />
         </div>
-      ) : (
-        <video
-          ref={videoElRef}
-          controls
-          playsInline
-          autoPlay={autoPlay}
-          preload="metadata"
-          poster={video.thumbnail}
-          className="w-full h-full block"
-          onLoadedData={handleLoaded}
-          onError={handleError}
-          onPlay={onPlay}
-          onPause={onPause}
-          onTimeUpdate={onTimeUpdate}
-          onEnded={onEnded}
-          onSeeked={onSeeked}
-          onWaiting={onWaiting}
-        >
-          {video.sources?.map((source) => (
-            <source
-              key={source.quality}
-              src={source.url}
-              type={source.type}
-              data-quality={source.quality}
-            />
-          ))}
-          Your browser does not support the video tag.
-        </video>
       )}
 
-      {isLoading && !error && (
-        <div
-          className="absolute inset-0 flex items-center justify-center bg-black/40 z-10"
-          aria-label="Loading video"
-        >
-          <Spinner size="lg" />
-        </div>
+      {showBigPlay && (
+        <BigPlayButton visible={showBigPlay} onClick={togglePlay} />
+      )}
+
+      {showControls && (
+        <Controls
+          isPlaying={isPlaying}
+          isWaiting={isWaiting}
+          currentTime={currentTime}
+          duration={duration}
+          buffered={buffered}
+          volume={volume}
+          muted={muted}
+          isTheater={isTheater}
+          isFullscreen={isFullscreen}
+          onTogglePlay={togglePlay}
+          onSeek={seek}
+          onDragChange={handleDragChange}
+          onSetVolume={setVolume}
+          onToggleMute={toggleMute}
+          onToggleTheater={toggleTheater}
+          onToggleFullscreen={toggleFullscreen}
+        />
       )}
     </div>
   )
@@ -129,11 +178,12 @@ VideoPlayer.propTypes = {
     ),
   }).isRequired,
   autoPlay: PropTypes.bool,
+  videoRef: PropTypes.func,
   onPlay: PropTypes.func,
   onPause: PropTypes.func,
   onTimeUpdate: PropTypes.func,
   onEnded: PropTypes.func,
   onSeeked: PropTypes.func,
   onWaiting: PropTypes.func,
-  videoRef: PropTypes.func,
+  onError: PropTypes.func,
 }

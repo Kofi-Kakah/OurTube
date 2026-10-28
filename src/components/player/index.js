@@ -1,1 +1,5 @@
 export { default as VideoPlayer } from './VideoPlayer'
+export { default as Controls } from './Controls'
+export { default as SeekBar } from './SeekBar'
+export { default as VolumeControl } from './VolumeControl'
+export { default as BigPlayButton } from './BigPlayButton'
