@@ -5,7 +5,7 @@ import {
   getChannels,
   getVideos,
 } from '@/services'
-import { useInfiniteScroll } from '@/hooks'
+import { useInfiniteScroll, usePageTitle } from '@/hooks'
 import { EmptyState, Button, Avatar, useToast } from '@/components/common'
 import { useUserStore } from '@/store'
 import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
@@ -26,6 +26,8 @@ export default function Subscriptions() {
 
   const [channels, setChannels] = useState([])
   const [channelsLoading, setChannelsLoading] = useState(true)
+
+  usePageTitle('Subscriptions — OurTube')
 
   useEffect(() => {
     let mounted = true

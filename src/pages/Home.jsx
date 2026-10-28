@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { getVideos, getCategories } from '@/services'
 import { CategoryChips, VideoGrid, VideoCardSkeleton } from '@/components/video'
 import { EmptyState, Button } from '@/components/common'
-import { useInfiniteScroll, useScrollRestoration } from '@/hooks'
+import { useInfiniteScroll, useScrollRestoration, usePageTitle } from '@/hooks'
 import { AlertCircle, Film, RefreshCw } from 'lucide-react'
 
 export default function Home() {
@@ -28,6 +28,8 @@ export default function Home() {
       isMounted = false
     }
   }, [])
+
+  usePageTitle('Home — OurTube')
 
   // Infinite scroll data fetcher
   const fetchVideosPage = useCallback(

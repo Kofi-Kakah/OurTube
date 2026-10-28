@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useThemeStore } from '@/store'
+import { ErrorBoundary } from '@/components/common'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import MobileDrawer from './MobileDrawer'
@@ -28,6 +29,12 @@ export default function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-base)] text-[var(--text-primary)]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:text-white focus:bg-[var(--accent)] focus:rounded focus:outline-none"
+      >
+        Skip to content
+      </a>
       <Navbar onToggleSidebar={handleToggleSidebar} />
 
       <div className="flex-1 flex w-full">
@@ -43,7 +50,9 @@ export default function AppShell() {
           tabIndex={-1}
           className="flex-1 overflow-x-hidden p-4 md:p-6 pb-20 md:pb-8 focus:outline-none"
         >
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 

@@ -5,6 +5,7 @@ import { getVideoById } from '@/services'
 import { EmptyState, Button } from '@/components/common'
 import { useHistoryStore } from '@/store'
 import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
+import { usePageTitle } from '@/hooks'
 import { Trash2, Play, Search, X, Clock } from 'lucide-react'
 
 const GROUP_LABELS = {
@@ -131,6 +132,8 @@ export default function History() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [loadedVideoIds, setLoadedVideoIds] = useState(new Set())
   const [videosById, setVideosById] = useState({})
+
+  usePageTitle('History — OurTube')
 
   // Filter entries by search query
   const filteredEntryIds = useMemo(() => {

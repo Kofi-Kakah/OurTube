@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getVideoById } from '@/services'
 import { EmptyState, Button } from '@/components/common'
 import { useUserStore } from '@/store'
+import { usePageTitle } from '@/hooks'
 import { useToast } from '@/components/common'
 import { formatDuration } from '@/utils/formatters'
 import { ThumbsDown } from 'lucide-react'
@@ -18,6 +19,8 @@ export default function LikedVideos() {
     removeLike,
     likeVideo,
   } = useUserStore()
+
+  usePageTitle('Liked Videos — OurTube')
 
   const [videos, setVideos] = useState([])
   const [isLoading, setIsLoading] = useState(true)

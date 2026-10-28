@@ -6,7 +6,7 @@ import {
 } from '@/services'
 import { VideoCard, VideoCardSkeleton, VideoGrid } from '@/components/video'
 import { EmptyState } from '@/components/common'
-import { useInfiniteScroll } from '@/hooks'
+import { useInfiniteScroll, usePageTitle } from '@/hooks'
 import { TrendingUp, Clock } from 'lucide-react'
 
 const EXPLORE_CATEGORY_LIMIT = 6
@@ -17,6 +17,8 @@ export default function Explore() {
   const [categorySections, setCategorySections] = useState([])
   const [sectionsLoading, setSectionsLoading] = useState(true)
   const [sectionsError, setSectionsError] = useState(null)
+
+  usePageTitle('Explore — OurTube')
 
   useEffect(() => {
     let mounted = true

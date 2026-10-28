@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { searchVideos } from '@/services'
 import { VideoListItem, VideoCardSkeleton } from '@/components/video'
 import { EmptyState, Button, Spinner } from '@/components/common'
-import { useInfiniteScroll, useScrollRestoration } from '@/hooks'
+import { useInfiniteScroll, useScrollRestoration, usePageTitle } from '@/hooks'
 import { AlertCircle, List } from 'lucide-react'
 
 const DURATION_OPTIONS = [
@@ -35,6 +35,8 @@ export default function Search() {
   const sort = searchParams.get('sort') || 'relevance'
   const duration = searchParams.get('duration') || 'all'
   const uploadDate = searchParams.get('uploadDate') || 'all'
+
+  usePageTitle(q ? `${q} — Search — OurTube` : 'Search — OurTube')
 
   const updateFilter = useCallback(
     (key, value) => {

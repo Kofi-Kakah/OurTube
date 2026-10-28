@@ -7,7 +7,7 @@ import { RecommendedList } from '@/components/video'
 import { CommentSection } from '@/components/comments'
 import { EmptyState, Button, Avatar } from '@/components/common'
 import { useHistoryStore, useUserStore } from '@/store'
-import { useKeyboardShortcuts } from '@/hooks'
+import { useKeyboardShortcuts, usePageTitle } from '@/hooks'
 import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
 import { AlertCircle, Clock, RotateCcw, Save, HelpCircle } from 'lucide-react'
 import { LikeDislikeButtons, SubscribeButton } from '@/components/video'
@@ -38,6 +38,8 @@ export default function Watch() {
     defaultPlaybackSpeed,
     setPlaybackSpeed,
   } = useUserStore()
+
+  usePageTitle(video ? `${video.title} — OurTube` : 'Watch — OurTube')
 
   const [video, setVideo] = useState(null)
   const [channel, setChannel] = useState(null)
@@ -104,7 +106,6 @@ export default function Watch() {
   }, [videoId, getProgress, clearCountdown])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadVideo()
   }, [loadVideo])
 

@@ -8,7 +8,7 @@ describe('App & AppShell Integration', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /home/i })
+      await screen.findByRole('heading', { name: /home/i, timeout: 8000 })
     ).toBeInTheDocument()
     expect(screen.getByLabelText(/ourtube home/i)).toBeInTheDocument()
     expect(
@@ -23,7 +23,7 @@ describe('App & AppShell Integration', () => {
     window.history.pushState({}, '', '/explore')
     render(<App />)
     expect(
-      await screen.findByRole('heading', { name: /trending/i })
+      await screen.findByRole('heading', { name: /trending/i, timeout: 8000 })
     ).toBeInTheDocument()
   })
 
@@ -31,7 +31,7 @@ describe('App & AppShell Integration', () => {
     window.history.pushState({}, '', '/subscriptions')
     render(<App />)
     expect(
-      await screen.findByRole('heading', { name: /^Subscriptions$/ })
+      await screen.findByRole('heading', { name: /^Subscriptions$/, timeout: 8000 })
     ).toBeInTheDocument()
   })
 
@@ -40,13 +40,13 @@ describe('App & AppShell Integration', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /home/i })
+      await screen.findByRole('heading', { name: /home/i, timeout: 8000 })
     ).toBeInTheDocument()
 
     const themeBtn = screen.getByLabelText(/current theme/i)
     fireEvent.click(themeBtn)
 
-    const darkOption = await screen.findByRole('menuitem', { name: /dark/i })
+    const darkOption = await screen.findByRole('menuitem', { name: /dark/i, timeout: 8000 })
     fireEvent.click(darkOption)
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')

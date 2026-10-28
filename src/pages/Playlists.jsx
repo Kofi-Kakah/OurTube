@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { usePlaylistStore } from '@/store'
+import { usePageTitle } from '@/hooks'
 import { EmptyState, Button } from '@/components/common'
 import { PlaylistCard, AddToPlaylistModal } from '@/components/playlists'
 
@@ -13,6 +14,8 @@ export default function Playlists() {
   const { playlists } = usePlaylistStore()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState(null)
+
+  usePageTitle('Playlists — OurTube')
 
   if (playlists.length === 0) {
     return (

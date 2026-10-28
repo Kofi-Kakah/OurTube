@@ -4,6 +4,7 @@ import PropTypes from 'prop-types'
 import { Play, Trash2, ArrowUp, ArrowDown, ChevronLeft, Plus } from 'lucide-react'
 import { getVideoById } from '@/services'
 import { usePlaylistStore } from '@/store'
+import { usePageTitle } from '@/hooks'
 import { EmptyState, Button } from '@/components/common'
 import { formatRelativeTime, formatDuration } from '@/utils/formatters'
 
@@ -25,6 +26,8 @@ export default function PlaylistDetail() {
 
   const playlist = playlists.find((p) => p.id === playlistId)
   const videoIds = useMemo(() => (playlist?.videoIds) || [], [playlist?.videoIds])
+
+  usePageTitle(playlist ? `${playlist.name} — OurTube` : 'Playlist — OurTube')
 
   const [editingName, setEditingName] = useState('')
   const [videosById, setVideosById] = useState({})

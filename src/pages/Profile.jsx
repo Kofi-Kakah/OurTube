@@ -21,7 +21,7 @@ import {
   useHistoryStore,
   useThemeStore,
 } from '@/store'
-import { useRecentSearches } from '@/hooks'
+import { useRecentSearches, usePageTitle } from '@/hooks'
 import { useToast } from '@/components/common'
 import { IconButton, Avatar, Modal, Dropdown } from '@/components/common'
 import Playlists from '@/pages/Playlists'
@@ -65,6 +65,8 @@ export default function Profile() {
   const { playlists } = usePlaylistStore()
   const { entries, clearHistory } = useHistoryStore()
   const { clear: clearRecentSearches } = useRecentSearches()
+
+  usePageTitle('Profile — OurTube')
 
   const [activeTab, setActiveTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
