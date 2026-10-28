@@ -7,8 +7,18 @@ import { Spinner } from '@/components/common'
  * Renders all available source qualities as `<source>` elements so the
  * browser can pick a playable one. Shows a loading scrim and error state.
  */
-export default function VideoPlayer({ video, autoPlay = false }) {
-  const videoRef = useRef(null)
+export default function VideoPlayer({
+  video,
+  autoPlay = false,
+  onPlay,
+  onPause,
+  onTimeUpdate,
+  onEnded,
+  onSeeked,
+  onWaiting,
+  videoRef,
+}) {
+  const videoElRef = useRef(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -18,9 +28,16 @@ export default function VideoPlayer({ video, autoPlay = false }) {
     setError('Unable to play this video. Please try again later.')
   }, [])
 
+  // Expose the video element to the parent (e.g. for resume seeking)
+  useEffect(() => {
+    if (videoRef && typeof videoRef === 'function') {
+      videoRef(videoElRef.current)
+    }
+  }, [videoRef])
+
   // Re-load the video source when the video changes and clean up on unmount
   useEffect(() => {
-    const videoEl = videoRef.current
+    const videoEl = videoElRef.current
     if (!videoEl) return
     videoEl.load()
     return () => {
@@ -33,7 +50,7 @@ export default function VideoPlayer({ video, autoPlay = false }) {
   const handleRetry = useCallback(() => {
     setError(null)
     setIsLoading(true)
-    videoRef.current?.load()
+    videoElRef.current?.load()
   }, [])
 
   return (
@@ -59,7 +76,7 @@ export default function VideoPlayer({ video, autoPlay = false }) {
         </div>
       ) : (
         <video
-          ref={videoRef}
+          ref={videoElRef}
           controls
           playsInline
           autoPlay={autoPlay}
@@ -68,6 +85,12 @@ export default function VideoPlayer({ video, autoPlay = false }) {
           className="w-full h-full block"
           onLoadedData={handleLoaded}
           onError={handleError}
+          onPlay={onPlay}
+          onPause={onPause}
+          onTimeUpdate={onTimeUpdate}
+          onEnded={onEnded}
+          onSeeked={onSeeked}
+          onWaiting={onWaiting}
         >
           {video.sources?.map((source) => (
             <source
@@ -106,4 +129,11 @@ VideoPlayer.propTypes = {
     ),
   }).isRequired,
   autoPlay: PropTypes.bool,
+  onPlay: PropTypes.func,
+  onPause: PropTypes.func,
+  onTimeUpdate: PropTypes.func,
+  onEnded: PropTypes.func,
+  onSeeked: PropTypes.func,
+  onWaiting: PropTypes.func,
+  videoRef: PropTypes.func,
 }

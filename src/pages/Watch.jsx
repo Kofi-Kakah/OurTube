@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import { getVideoById, getChannelById } from '@/services'
@@ -6,24 +6,39 @@ import { VideoPlayer } from '@/components/player'
 import { RecommendedList } from '@/components/video'
 import { CommentSection } from '@/components/comments'
 import { EmptyState, Button, Avatar } from '@/components/common'
-import { formatViews, formatRelativeTime } from '@/utils/formatters'
-import { AlertCircle } from 'lucide-react'
+import { useHistoryStore } from '@/store'
+import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
+import { AlertCircle, Clock, RotateCcw } from 'lucide-react'
 import { LikeDislikeButtons, SubscribeButton } from '@/components/video'
 
 /**
  * Watch page: native video player, video details, recommended videos, comments.
  * Responsive: single column on mobile, two-column (player/recommended left,
  * details right) on lg+. Handles invalid videoId with a 404-style state.
- * Like/dislike and subscribe actions are intentionally omitted (Phase 7).
+ * Progress tracking: records history on play, saves progress every ~5s while
+ * playing and on pause/unload, supports resume with a "Start over" option.
  */
 export default function Watch() {
   const { videoId } = useParams()
+  const {
+    addEntry,
+    updateProgress,
+    getProgress,
+  } = useHistoryStore()
 
   const [video, setVideo] = useState(null)
   const [channel, setChannel] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [resumeChoice, setResumeChoice] = useState(null) // 'resume' | 'over' | null
+  const [resumeSeconds, setResumeSeconds] = useState(0)
+  const [resumeDuration, setResumeDuration] = useState(0)
+
+  const videoElRef = useRef(null)
+  const lastSaveRef = useRef(0)
+
+  const SAVE_INTERVAL_MS = 5000
 
   const loadVideo = useCallback(async () => {
     if (!videoId) {
@@ -43,19 +58,110 @@ export default function Watch() {
       setVideo(v)
       const ch = await getChannelById(v.channelId)
       setChannel(ch)
+
+      // Check for saved progress to offer resume
+      const saved = getProgress(videoId)
+      if (saved && saved.percentage > 0 && saved.percentage < 100) {
+        setResumeSeconds(saved.progressSeconds)
+        setResumeDuration(saved.durationSeconds)
+        setResumeChoice(null)
+      }
     } catch {
       setError('Failed to load video. Please try again.')
     } finally {
       setIsLoading(false)
     }
-  }, [videoId])
+  }, [videoId, getProgress])
 
   useEffect(() => {
-    // Data fetching in an effect is the standard pattern; setState calls
-    // happen asynchronously after awaits, not synchronously in the body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadVideo()
   }, [loadVideo])
+
+  // Persist progress on unmount / route change
+  useEffect(() => {
+    return () => {
+      if (videoElRef.current && video) {
+        updateProgress(
+          videoId,
+          videoElRef.current.currentTime,
+          videoElRef.current.duration
+        )
+      }
+    }
+  }, [videoId, video, updateProgress])
+
+  const handlePlay = useCallback(() => {
+    if (videoElRef.current) {
+      addEntry({
+        videoId,
+        progressSeconds: Math.floor(videoElRef.current.currentTime),
+        durationSeconds: Math.floor(videoElRef.current.duration || 0),
+      })
+    }
+    lastSaveRef.current = Date.now()
+  }, [videoId, addEntry])
+
+  const handlePause = useCallback(() => {
+    if (videoElRef.current) {
+      updateProgress(
+        videoId,
+        Math.floor(videoElRef.current.currentTime),
+        Math.floor(videoElRef.current.duration || 0)
+      )
+    }
+  }, [videoId, updateProgress])
+
+  const handleTimeUpdate = useCallback(() => {
+    if (!videoElRef.current) return
+    const now = Date.now()
+    if (now - lastSaveRef.current < SAVE_INTERVAL_MS) return
+    lastSaveRef.current = now
+    updateProgress(
+      videoId,
+      Math.floor(videoElRef.current.currentTime),
+      Math.floor(videoElRef.current.duration || 0)
+    )
+  }, [videoId, updateProgress])
+
+  const handleEnded = useCallback(() => {
+    // Mark completed: store resets progress when >= 95% watched
+    if (videoElRef.current) {
+      updateProgress(
+        videoId,
+        Math.floor(videoElRef.current.duration || 0),
+        Math.floor(videoElRef.current.duration || 0)
+      )
+    }
+    setResumeChoice(null)
+  }, [videoId, updateProgress])
+
+  const handleSeeked = useCallback(() => {
+    lastSaveRef.current = Date.now()
+  }, [])
+
+  const handleResume = () => {
+    setResumeChoice('resume')
+    if (videoElRef.current && resumeSeconds > 0) {
+      videoElRef.current.currentTime = resumeSeconds
+    }
+  }
+
+  const handleStartOver = () => {
+    setResumeChoice('over')
+    if (videoElRef.current) {
+      videoElRef.current.currentTime = 0
+    }
+  }
+
+  const resumeLabel =
+    resumeSeconds > 0 && resumeDuration > 0
+      ? `${formatRelativeTime(new Date().toISOString())} — ${Math.floor(
+          resumeSeconds / 60
+        )}:${String(resumeSeconds % 60).padStart(2, '0')} / ${formatDuration(
+          resumeDuration
+        )}`
+      : null
 
   if (isLoading) {
     return (
@@ -85,11 +191,57 @@ export default function Watch() {
     )
   }
 
+  const showResume =
+    resumeChoice === null && resumeSeconds > 0 && resumeDuration > 0
+
   return (
     <div className="flex flex-col gap-6 w-full pb-8">
+      {/* Resume banner */}
+      {showResume && (
+        <div
+          className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface-elevated)] text-sm"
+        >
+          <div className="flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 shrink-0 text-[var(--text-secondary)]" />
+            <span className="text-[var(--text-secondary)]">
+              Resume from {Math.floor(resumeSeconds / 60)}:{String(
+              resumeSeconds % 60
+            ).padStart(2, '0')}?
+          </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleResume}
+              className="text-xs font-medium text-[var(--accent)] hover:underline"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={handleStartOver}
+              className="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+            >
+              Start over
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Player */}
       <section className="w-full">
-        <VideoPlayer video={video} autoPlay={false} />
+        <VideoPlayer
+          video={video}
+          autoPlay={false}
+          videoRef={(el) => {
+            videoElRef.current = el
+          }}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={handleEnded}
+          onSeeked={handleSeeked}
+        />
       </section>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -105,6 +257,7 @@ export default function Watch() {
             channel={channel}
             descriptionExpanded={descriptionExpanded}
             setDescriptionExpanded={setDescriptionExpanded}
+            resumeLabel={resumeLabel}
           />
         </div>
       </div>
@@ -116,6 +269,7 @@ export default function Watch() {
           channel={channel}
           descriptionExpanded={descriptionExpanded}
           setDescriptionExpanded={setDescriptionExpanded}
+          resumeLabel={resumeLabel}
         />
         <RecommendedList videoId={video.id} />
       </div>
@@ -135,6 +289,7 @@ function VideoDetails({
   channel,
   descriptionExpanded,
   setDescriptionExpanded,
+  resumeLabel,
 }) {
   const isLong = video.description.length > 160
   const channelName = channel?.name || 'Unknown Channel'
@@ -159,6 +314,12 @@ function VideoDetails({
           {subscribers != null && (
             <p className="text-xs text-[var(--text-secondary)]">
               {subscribers.toLocaleString()} subscribers
+            </p>
+          )}
+          {resumeLabel && (
+            <p className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-1">
+              <RotateCcw className="w-3 h-3 shrink-0" />
+              <span>Resume: {resumeLabel}</span>
             </p>
           )}
         </div>
@@ -210,4 +371,5 @@ VideoDetails.propTypes = {
   channel: PropTypes.object,
   descriptionExpanded: PropTypes.bool.isRequired,
   setDescriptionExpanded: PropTypes.func.isRequired,
+  resumeLabel: PropTypes.string,
 }
