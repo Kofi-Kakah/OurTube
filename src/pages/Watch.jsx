@@ -1,31 +1,43 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
-import { getVideoById, getChannelById } from '@/services'
+import { getVideoById, getChannelById, getRecommended } from '@/services'
 import { VideoPlayer } from '@/components/player'
 import { RecommendedList } from '@/components/video'
 import { CommentSection } from '@/components/comments'
 import { EmptyState, Button, Avatar } from '@/components/common'
-import { useHistoryStore } from '@/store'
+import { useHistoryStore, useUserStore } from '@/store'
+import { useKeyboardShortcuts } from '@/hooks'
 import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
-import { AlertCircle, Clock, RotateCcw, Save } from 'lucide-react'
+import { AlertCircle, Clock, RotateCcw, Save, HelpCircle } from 'lucide-react'
 import { LikeDislikeButtons, SubscribeButton } from '@/components/video'
 import { AddToPlaylistModal } from '@/components/playlists'
+import KeyboardShortcutsHelp from '@/components/player/KeyboardShortcutsHelp'
+
+const AUTOPAY_COUNTDOWN_SECONDS = 5
 
 /**
- * Watch page: native video player, video details, recommended videos, comments.
+ * Watch page: custom video player, video details, recommended videos, comments.
  * Responsive: single column on mobile, two-column (player/recommended left,
  * details right) on lg+. Handles invalid videoId with a 404-style state.
  * Progress tracking: records history on play, saves progress every ~5s while
  * playing and on pause/unload, supports resume with a "Start over" option.
+ * Autoplay next: 5-second countdown when a video ends (respects autoplay toggle).
+ * Keyboard shortcuts with on-screen indicators + help modal.
  */
 export default function Watch() {
   const { videoId } = useParams()
+  const navigate = useNavigate()
   const {
     addEntry,
     updateProgress,
     getProgress,
   } = useHistoryStore()
+  const {
+    autoplayDefault,
+    defaultPlaybackSpeed,
+    setPlaybackSpeed,
+  } = useUserStore()
 
   const [video, setVideo] = useState(null)
   const [channel, setChannel] = useState(null)
@@ -37,11 +49,24 @@ export default function Watch() {
   const [resumeDuration, setResumeDuration] = useState(0)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState(null)
+  const [autoplayCountdown, setAutoplayCountdown] = useState(null)
+  const [nextVideo, setNextVideo] = useState(null)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const videoElRef = useRef(null)
   const lastSaveRef = useRef(0)
+  const countdownTimerRef = useRef(null)
 
   const SAVE_INTERVAL_MS = 5000
+
+  const clearCountdown = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current)
+      countdownTimerRef.current = null
+    }
+    setAutoplayCountdown(null)
+    setNextVideo(null)
+  }, [])
 
   const loadVideo = useCallback(async () => {
     if (!videoId) {
@@ -49,6 +74,8 @@ export default function Watch() {
       setIsLoading(false)
       return
     }
+    // Clear any pending autoplay countdown when loading a new video
+    clearCountdown()
     setIsLoading(true)
     setError(null)
     try {
@@ -74,7 +101,7 @@ export default function Watch() {
     } finally {
       setIsLoading(false)
     }
-  }, [videoId, getProgress])
+  }, [videoId, getProgress, clearCountdown])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -84,6 +111,7 @@ export default function Watch() {
   // Persist progress on unmount / route change
   useEffect(() => {
     return () => {
+      clearCountdown()
       if (videoElRef.current && video) {
         updateProgress(
           videoId,
@@ -92,7 +120,7 @@ export default function Watch() {
         )
       }
     }
-  }, [videoId, video, updateProgress])
+  }, [videoId, video, updateProgress, clearCountdown])
 
   const handlePlay = useCallback(() => {
     if (videoElRef.current) {
@@ -127,7 +155,7 @@ export default function Watch() {
     )
   }, [videoId, updateProgress])
 
-  const handleEnded = useCallback(() => {
+  const handleEnded = useCallback(async () => {
     // Mark completed: store resets progress when >= 95% watched
     if (videoElRef.current) {
       updateProgress(
@@ -137,7 +165,30 @@ export default function Watch() {
       )
     }
     setResumeChoice(null)
-  }, [videoId, updateProgress])
+
+    // Autoplay next video when enabled
+    if (!autoplayDefault || !videoElRef.current) return
+    clearCountdown()
+    try {
+      const data = await getRecommended(videoId, { page: 1, limit: 1 })
+      const next = data.items?.[0]
+      if (!next) return
+      setNextVideo(next)
+      let remaining = AUTOPAY_COUNTDOWN_SECONDS
+      setAutoplayCountdown(remaining)
+      countdownTimerRef.current = setInterval(() => {
+        remaining -= 1
+        if (remaining <= 0) {
+          clearCountdown()
+          navigate(`/watch/${next.id}`)
+        } else {
+          setAutoplayCountdown(remaining)
+        }
+      }, 1000)
+    } catch {
+      // ignore autoplay fetch failures
+    }
+  }, [videoId, autoplayDefault, updateProgress, clearCountdown, navigate])
 
   const handleSeeked = useCallback(() => {
     lastSaveRef.current = Date.now()
@@ -165,6 +216,90 @@ export default function Watch() {
           resumeDuration
         )}`
       : null
+
+  // ---------- keyboard shortcuts ----------
+
+  const { indicator } = useKeyboardShortcuts({
+    enabled: true,
+    currentPlaybackRate: defaultPlaybackSpeed,
+    onPlayPause: () => {
+      if (videoElRef.current) {
+        if (videoElRef.current.paused) videoElRef.current.play().catch(() => {})
+        else videoElRef.current.pause()
+      }
+    },
+    onSeekBackward5: () => {
+      if (videoElRef.current)
+        videoElRef.current.currentTime = Math.max(
+          0,
+          videoElRef.current.currentTime - 5
+        )
+    },
+    onSeekForward5: () => {
+      if (videoElRef.current)
+        videoElRef.current.currentTime = Math.min(
+          videoElRef.current.duration || 0,
+          videoElRef.current.currentTime + 5
+        )
+    },
+    onSeekBackward10: () => {
+      if (videoElRef.current)
+        videoElRef.current.currentTime = Math.max(
+          0,
+          videoElRef.current.currentTime - 10
+        )
+    },
+    onSeekForward10: () => {
+      if (videoElRef.current)
+        videoElRef.current.currentTime = Math.min(
+          videoElRef.current.duration || 0,
+          videoElRef.current.currentTime + 10
+        )
+    },
+    onVolumeUp: () => {
+      if (videoElRef.current) {
+        videoElRef.current.muted = false
+        videoElRef.current.volume = Math.min(
+          1,
+          videoElRef.current.volume + 0.05
+        )
+      }
+    },
+    onVolumeDown: () => {
+      if (videoElRef.current) {
+        videoElRef.current.muted = false
+        videoElRef.current.volume = Math.max(
+          0,
+          videoElRef.current.volume - 0.05
+        )
+      }
+    },
+    onToggleMute: () => {
+      if (videoElRef.current) videoElRef.current.muted = !videoElRef.current.muted
+    },
+    onToggleFullscreen: () => {},
+    onToggleTheater: () => {},
+    onTogglePiP: () => {},
+    onSetPlaybackRate: (rate) => {
+      if (videoElRef.current) videoElRef.current.playbackRate = rate
+      setPlaybackSpeed(rate)
+    },
+    onJumpToPercent: (percent) => {
+      if (videoElRef.current && videoElRef.current.duration) {
+        videoElRef.current.currentTime = (percent / 100) * videoElRef.current.duration
+      }
+    },
+    onGoToStart: () => {
+      if (videoElRef.current) videoElRef.current.currentTime = 0
+    },
+    onGoToEnd: () => {
+      if (videoElRef.current) videoElRef.current.currentTime = videoElRef.current.duration || 0
+    },
+    onNextVideo: () => {
+      navigate('/watch/' + (nextVideo?.id || videoId))
+    },
+    onToggleHelp: () => setHelpOpen((prev) => !prev),
+  })
 
   if (isLoading) {
     return (
@@ -196,6 +331,10 @@ export default function Watch() {
 
   const showResume =
     resumeChoice === null && resumeSeconds > 0 && resumeDuration > 0
+
+  // Autoplay countdown overlay
+  const showCountdown =
+    autoplayCountdown != null && nextVideo && autoplayDefault
 
   return (
     <div className="flex flex-col gap-6 w-full pb-8">
@@ -230,7 +369,51 @@ export default function Watch() {
           </div>
         </div>
       )}
-      
+
+      {/* Autoplay next countdown */}
+  {showCountdown && (
+    <div
+      className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-black/75 text-white"
+    >
+          <div className="rounded-2xl bg-[var(--bg-surface-elevated)] border border-[var(--border-color)] p-6 text-center max-w-md w-full mx-4">
+            <HelpCircle className="w-6 h-6 text-[var(--accent)] mb-3" />
+            <h3 className="font-semibold text-[var(--text-primary)] mb-1">
+              Up next
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4 truncate">
+              {nextVideo.title}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-[var(--accent)] font-mono font-bold text-lg">
+                {autoplayCountdown}
+              </span>
+              <span className="text-sm text-[var(--text-secondary)]">
+                seconds
+              </span>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={clearCountdown}
+                className="px-3 py-1.5 rounded text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface-elevated)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearCountdown()
+                  navigate(`/watch/${nextVideo.id}`)
+                }}
+                className="px-3 py-1.5 rounded text-xs font-medium text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors"
+              >
+                Play now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Save to playlist action */}
       <div className="flex justify-end px-1">
         <button
@@ -248,7 +431,7 @@ export default function Watch() {
       </div>
 
       {/* Player */}
-      <section className="w-full">
+      <section className="w-full relative">
         <VideoPlayer
           video={video}
           autoPlay={false}
@@ -260,8 +443,20 @@ export default function Watch() {
           onTimeUpdate={handleTimeUpdate}
           onEnded={handleEnded}
           onSeeked={handleSeeked}
+          onToggleTheater={() => {}}
+          onToggleFullscreen={() => {}}
+          onTogglePiP={() => {}}
         />
       </section>
+
+      {/* On-screen shortcut indicator */}
+      {indicator && (
+        <div
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-lg bg-black/80 text-white text-xs font-medium whitespace-nowrap"
+        >
+          {indicator.text}
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left: Recommended */}
@@ -304,6 +499,10 @@ export default function Watch() {
           setSelectedVideoId(null)
         }}
         videoId={selectedVideoId}
+      />
+      <KeyboardShortcutsHelp
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
       />
     </div>
   )

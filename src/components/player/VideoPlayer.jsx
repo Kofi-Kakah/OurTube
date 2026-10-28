@@ -1,13 +1,14 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import { AlertCircle, RefreshCw } from 'lucide-react'
 import { Spinner } from '@/components/common'
 import { useVideoPlayer } from '@/hooks'
+import { useUserStore } from '@/store'
 import BigPlayButton from './BigPlayButton'
 import Controls from './Controls'
 
 /**
- * Custom video player (Phase 11). Replaces native `<video controls>` with a
+ * Custom video player (Phase 11+12). Replaces native `<video controls>` with a
  * custom, accessible, always-dark-themed control overlay.
  *
  * Props mirror the previous native-player interface so Watch.jsx keeps working:
@@ -16,6 +17,10 @@ import Controls from './Controls'
  *
  * Progress tracking (Phase 8) continues to work: Watch passes callbacks that
  * read currentTime/duration from the exposed video ref.
+ *
+ * Settings (Phase 12): playback speed, quality, autoplay are persisted via
+ * userStore and applied to the video element. PiP and keyboard shortcuts are
+ * wired up here.
  */
 export default function VideoPlayer({
   video,
@@ -28,9 +33,23 @@ export default function VideoPlayer({
   onSeeked,
   onWaiting,
   onError,
+  onToggleTheater,
+  onToggleFullscreen,
+  onTogglePiP,
 }) {
   const {
-    elRef,
+    autoplayDefault,
+    defaultPlaybackSpeed,
+    defaultQuality,
+    toggleAutoplay,
+    setPlaybackSpeed: storeSetPlaybackSpeed,
+    setDefaultQuality: storeSetDefaultQuality,
+  } = useUserStore()
+
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const {
+    setVideoRef,
     containerRef,
     state,
     setHover,
@@ -38,13 +57,20 @@ export default function VideoPlayer({
     seek,
     setVolume,
     toggleMute,
+    setPlaybackRate,
+    setQuality,
     toggleFullscreen,
     toggleTheater,
+    togglePiP,
     retry,
+    qualities,
+    pipSupported,
   } = useVideoPlayer({
     video,
     autoPlay,
     videoRef,
+    initialPlaybackRate: defaultPlaybackSpeed,
+    initialQuality: defaultQuality,
     onPlay,
     onPause,
     onTimeUpdate,
@@ -67,6 +93,7 @@ export default function VideoPlayer({
     showBigPlay,
     isTheater,
     isFullscreen,
+    isPiP,
   } = state
 
   const showControls = controlsVisible || !isPlaying || isWaiting
@@ -78,6 +105,44 @@ export default function VideoPlayer({
   const handleDragChange = useCallback(() => {
     // scrubbing suppression is handled inside the hook
   }, [])
+
+  const handleSetPlaybackRate = useCallback(
+    (rate) => {
+      setPlaybackRate(rate)
+      storeSetPlaybackSpeed(rate)
+    },
+    [setPlaybackRate, storeSetPlaybackSpeed]
+  )
+
+  const handleSetQuality = useCallback(
+    (q) => {
+      setQuality(q)
+      storeSetDefaultQuality(q)
+    },
+    [setQuality, storeSetDefaultQuality]
+  )
+
+  const handleToggleAutoplay = useCallback(() => {
+    toggleAutoplay()
+  }, [toggleAutoplay])
+
+  const handleToggleTheater = useCallback(() => {
+    toggleTheater()
+    onToggleTheater?.()
+  }, [toggleTheater, onToggleTheater])
+
+  const handleToggleFullscreen = useCallback(() => {
+    toggleFullscreen()
+    onToggleFullscreen?.()
+  }, [toggleFullscreen, onToggleFullscreen])
+
+  const handleTogglePiP = useCallback(() => {
+    togglePiP()
+    onTogglePiP?.()
+  }, [togglePiP, onTogglePiP])
+
+  const handleOpenSettings = useCallback(() => setSettingsOpen(true), [])
+  const handleCloseSettings = useCallback(() => setSettingsOpen(false), [])
 
   if (error) {
     return (
@@ -114,7 +179,7 @@ export default function VideoPlayer({
       onMouseLeave={() => setHover(false)}
     >
       <video
-        ref={elRef}
+        ref={setVideoRef}
         playsInline
         preload="metadata"
         poster={video.thumbnail}
@@ -152,13 +217,26 @@ export default function VideoPlayer({
           muted={muted}
           isTheater={isTheater}
           isFullscreen={isFullscreen}
+          isPiP={isPiP}
+          pipSupported={pipSupported}
+          currentSpeed={state.playbackRate}
+          currentQuality={state.quality}
+          qualities={qualities}
+          autoplay={autoplayDefault}
           onTogglePlay={togglePlay}
           onSeek={seek}
           onDragChange={handleDragChange}
           onSetVolume={setVolume}
           onToggleMute={toggleMute}
-          onToggleTheater={toggleTheater}
-          onToggleFullscreen={toggleFullscreen}
+          onSetPlaybackRate={handleSetPlaybackRate}
+          onSetQuality={handleSetQuality}
+          onToggleAutoplay={handleToggleAutoplay}
+          onToggleTheater={handleToggleTheater}
+          onToggleFullscreen={handleToggleFullscreen}
+          onTogglePiP={handleTogglePiP}
+          onOpenSettings={handleOpenSettings}
+          onCloseSettings={handleCloseSettings}
+          settingsOpen={settingsOpen}
         />
       )}
     </div>
@@ -186,4 +264,7 @@ VideoPlayer.propTypes = {
   onSeeked: PropTypes.func,
   onWaiting: PropTypes.func,
   onError: PropTypes.func,
+  onToggleTheater: PropTypes.func,
+  onToggleFullscreen: PropTypes.func,
+  onTogglePiP: PropTypes.func,
 }

@@ -8,7 +8,7 @@ const SKIP_SECONDS = 10
 /**
  * useVideoPlayer — owns the <video> element and all playback state/actions.
  * Exposes a ref callback to attach to <video>, plus presentational state and
- * imperative play/pause/seek/volume/fullscreen/theater controls.
+ * imperative play/pause/seek/volume/fullscreen/theater/PiP/speed/quality controls.
  *
  * All high-frequency values (currentTime) live in local component state, never
  * in global stores. Media event listeners are cleaned up on unmount.
@@ -17,6 +17,8 @@ export function useVideoPlayer({
   video,
   autoPlay = false,
   videoRef,
+  initialPlaybackRate = 1,
+  initialQuality = 'auto',
   onPlay,
   onPause,
   onTimeUpdate,
@@ -24,6 +26,8 @@ export function useVideoPlayer({
   onSeeked,
   onWaiting,
   onError,
+  onEnterPiP,
+  onLeavePiP,
 }) {
   const elRef = useRef(null)
   const containerRef = useRef(null)
@@ -49,12 +53,20 @@ export function useVideoPlayer({
     showBigPlay: true,
     isFullscreen: false,
     isTheater: false,
-    playbackRate: 1,
-    quality: 'auto',
+    playbackRate: initialPlaybackRate,
+    quality: initialQuality,
+    isPiP: false,
   })
+
+  const pipSupported =
+    typeof document !== 'undefined' && !!document.pictureInPictureEnabled
 
   const set = useCallback((next) => setState((prev) => ({ ...prev, ...next })), [])
   const el = useCallback(() => elRef.current, [])
+
+  const qualities = useCallback(() => {
+    return video?.sources?.map((s) => s.quality) ?? []
+  }, [video?.sources])
 
   const exposeRef = useCallback(
     (node) => {
@@ -63,6 +75,10 @@ export function useVideoPlayer({
     },
     [videoRef]
   )
+
+  const setContainerRef = useCallback((node) => {
+    containerRef.current = node
+  }, [])
 
   const play = useCallback(() => {
     const e = el()
@@ -118,6 +134,35 @@ export function useVideoPlayer({
     }
   }, [el, state.muted, set])
 
+  const setPlaybackRate = useCallback(
+    (rate) => {
+      const e = el()
+      if (!e) return
+      e.playbackRate = rate
+      setState((prev) => ({ ...prev, playbackRate: rate }))
+    },
+    [el]
+  )
+
+  const setQuality = useCallback(
+    (q) => {
+      const e = el()
+      if (!e || q === state.quality) return
+      const source = video?.sources?.find((s) => s.quality === q)
+      if (!source) return
+      const wasPlaying = !e.paused
+      const currentTime = e.currentTime
+      e.src = source.url
+      e.currentTime = currentTime
+      e.load()
+      if (wasPlaying) {
+        e.play().catch(() => {})
+      }
+      setState((prev) => ({ ...prev, quality: q }))
+    },
+    [el, video, state.quality]
+  )
+
   const toggleFullscreen = useCallback(() => {
     const c = containerRef.current
     if (!c) return
@@ -130,17 +175,19 @@ export function useVideoPlayer({
 
   const toggleTheater = useCallback(() => setState((prev) => ({ ...prev, isTheater: !prev.isTheater })), [])
 
-  const setPlaybackRate = useCallback(
-    (rate) => {
-      const e = el()
-      if (!e) return
-      e.playbackRate = rate
-      setState((prev) => ({ ...prev, playbackRate: rate }))
-    },
-    [el]
-  )
-
-  const setQuality = useCallback((q) => setState((prev) => ({ ...prev, quality: q })), [])
+  const togglePiP = useCallback(async () => {
+    const e = el()
+    if (!e || !pipSupported) return
+    try {
+      if (document.pictureInPictureElement === e) {
+        await document.exitPictureInPicture()
+      } else {
+        await e.requestPictureInPicture()
+      }
+    } catch {
+      // PiP failed or not supported
+    }
+  }, [el, pipSupported])
 
   const retry = useCallback(() => {
     setState((prev) => ({ ...prev, error: null, isWaiting: true }))
@@ -220,6 +267,16 @@ export function useVideoPlayer({
     }
     setState((prev) => ({ ...prev, buffered: pct }))
   }, [el])
+
+  const handleEnterPiP = useCallback(() => {
+    setState((prev) => ({ ...prev, isPiP: true }))
+    onEnterPiP?.()
+  }, [onEnterPiP])
+
+  const handleLeavePiP = useCallback(() => {
+    setState((prev) => ({ ...prev, isPiP: false }))
+    onLeavePiP?.()
+  }, [onLeavePiP])
 
   const handleEnded = useCallback(() => {
     isPlayingRef.current = false
@@ -310,6 +367,14 @@ export function useVideoPlayer({
     }
   }, [video, autoPlay, el])
 
+  // ---------- apply playbackRate on mount/change ----------
+
+  useEffect(() => {
+    const e = el()
+    if (!e) return
+    e.playbackRate = state.playbackRate
+  }, [el, state.playbackRate])
+
   // ---------- wire media event listeners ----------
 
   useEffect(() => {
@@ -317,7 +382,6 @@ export function useVideoPlayer({
     if (!e) return
     e.volume = rememberVolumeRef.current
     e.muted = state.muted
-    e.playbackRate = state.playbackRate
 
     e.addEventListener('play', handlePlay)
     e.addEventListener('pause', handlePause)
@@ -326,6 +390,8 @@ export function useVideoPlayer({
     e.addEventListener('timeupdate', handleTimeUpdate)
     e.addEventListener('durationchange', handleDurationChange)
     e.addEventListener('progress', handleProgress)
+    e.addEventListener('enterpictureinpicture', handleEnterPiP)
+    e.addEventListener('leavepictureinpicture', handleLeavePiP)
     e.addEventListener('ended', handleEnded)
     e.addEventListener('error', handleError)
     e.addEventListener('seeked', handleSeeked)
@@ -338,6 +404,8 @@ export function useVideoPlayer({
       e.removeEventListener('timeupdate', handleTimeUpdate)
       e.removeEventListener('durationchange', handleDurationChange)
       e.removeEventListener('progress', handleProgress)
+      e.removeEventListener('enterpictureinpicture', handleEnterPiP)
+      e.removeEventListener('leavepictureinpicture', handleLeavePiP)
       e.removeEventListener('ended', handleEnded)
       e.removeEventListener('error', handleError)
       e.removeEventListener('seeked', handleSeeked)
@@ -345,7 +413,6 @@ export function useVideoPlayer({
   }, [
     el,
     state.muted,
-    state.playbackRate,
     handlePlay,
     handlePause,
     handleWaiting,
@@ -353,6 +420,8 @@ export function useVideoPlayer({
     handleTimeUpdate,
     handleDurationChange,
     handleProgress,
+    handleEnterPiP,
+    handleLeavePiP,
     handleEnded,
     handleError,
     handleSeeked,
@@ -368,20 +437,23 @@ export function useVideoPlayer({
   }, [showControls, scheduleHide])
 
   return {
-    elRef: exposeRef,
-    containerRef,
+    videoRef: exposeRef,
+    containerRef: setContainerRef,
     state,
     setHover,
+    qualities: qualities(),
+    pipSupported,
     play,
     pause,
     togglePlay,
     seek,
     setVolume,
     toggleMute,
-    toggleFullscreen,
-    toggleTheater,
     setPlaybackRate,
     setQuality,
+    toggleFullscreen,
+    toggleTheater,
+    togglePiP,
     retry,
     showControls,
   }
