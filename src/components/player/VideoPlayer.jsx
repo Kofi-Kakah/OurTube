@@ -180,19 +180,12 @@ export default function VideoPlayer({
     >
       <video
         ref={setVideoRef}
+        src={video.sources?.[0]?.url}
         playsInline
         preload="metadata"
         poster={video.thumbnail}
         className="w-full h-full block"
       >
-        {video.sources?.map((source) => (
-          <source
-            key={source.quality}
-            src={source.url}
-            type={source.type}
-            data-quality={source.quality}
-          />
-        ))}
         Your browser does not support the video tag.
       </video>
 

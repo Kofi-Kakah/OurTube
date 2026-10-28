@@ -39,8 +39,6 @@ export default function Watch() {
     setPlaybackSpeed,
   } = useUserStore()
 
-  usePageTitle(video ? `${video.title} — OurTube` : 'Watch — OurTube')
-
   const [video, setVideo] = useState(null)
   const [channel, setChannel] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -54,6 +52,8 @@ export default function Watch() {
   const [autoplayCountdown, setAutoplayCountdown] = useState(null)
   const [nextVideo, setNextVideo] = useState(null)
   const [helpOpen, setHelpOpen] = useState(false)
+
+  usePageTitle(video ? `${video.title} — OurTube` : 'Watch — OurTube')
 
   const videoElRef = useRef(null)
   const lastSaveRef = useRef(0)
@@ -106,6 +106,7 @@ export default function Watch() {
   }, [videoId, getProgress, clearCountdown])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadVideo()
   }, [loadVideo])
 
