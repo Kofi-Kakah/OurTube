@@ -9,6 +9,9 @@ import {
   ListVideo,
   User,
 } from 'lucide-react'
+import { useUserStore } from '@/store'
+import { Avatar } from '@/components/common'
+import { channels } from '@/data'
 
 const mainNavItems = [
   { label: 'Home', path: '/', icon: Home },
@@ -24,6 +27,9 @@ const libraryNavItems = [
 ]
 
 export default function Sidebar({ isCollapsed = false }) {
+  const { isSubscribed } = useUserStore()
+  const subscribedChannels = channels.filter((c) => isSubscribed(c.id))
+
   const renderNavLink = (item) => {
     const Icon = item.icon
     return (
@@ -71,6 +77,32 @@ export default function Sidebar({ isCollapsed = false }) {
           </span>
         )}
         {libraryNavItems.map(renderNavLink)}
+
+        {!isCollapsed && subscribedChannels.length > 0 && (
+          <>
+            <div className="my-2 border-t border-[var(--border-color)]" />
+            <span className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+              Subscribed channels
+            </span>
+            <div className="flex flex-col gap-1">
+              {subscribedChannels.map((channel) => (
+                <div
+                  key={channel.id}
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface-elevated)] transition-colors cursor-default group"
+                >
+                  <Avatar
+                    src={channel.avatar}
+                    name={channel.name}
+                    size="xs"
+                    className="ring-1 ring-[var(--border-color)]"
+                  />
+                  <span className="truncate">{channel.name}</span>
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--accent)]" aria-hidden="true" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </nav>
     </aside>
   )
@@ -79,3 +111,4 @@ export default function Sidebar({ isCollapsed = false }) {
 Sidebar.propTypes = {
   isCollapsed: PropTypes.bool,
 }
+

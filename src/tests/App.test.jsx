@@ -27,11 +27,11 @@ describe('App & AppShell Integration', () => {
     ).toBeInTheDocument()
   })
 
-  it('navigates to Subscriptions and renders Subscriptions placeholder', async () => {
+  it('navigates to Subscriptions and renders Subscriptions page', async () => {
     window.history.pushState({}, '', '/subscriptions')
     render(<App />)
     expect(
-      await screen.findByRole('heading', { name: /subscriptions/i })
+      await screen.findByRole('heading', { name: /^Subscriptions$/ })
     ).toBeInTheDocument()
   })
 

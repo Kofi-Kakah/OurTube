@@ -8,6 +8,7 @@ import { CommentSection } from '@/components/comments'
 import { EmptyState, Button, Avatar } from '@/components/common'
 import { formatViews, formatRelativeTime } from '@/utils/formatters'
 import { AlertCircle } from 'lucide-react'
+import { LikeDislikeButtons, SubscribeButton } from '@/components/video'
 
 /**
  * Watch page: native video player, video details, recommended videos, comments.
@@ -160,6 +161,14 @@ function VideoDetails({
               {subscribers.toLocaleString()} subscribers
             </p>
           )}
+        </div>
+        <div className="shrink-0 flex flex-col gap-1">
+          <LikeDislikeButtons videoId={video.id} likesCount={video.likesCount} />
+          <SubscribeButton
+            channelId={channel?.id || ''}
+            channelName={channelName}
+            subscriberCount={subscribers ?? 0}
+          />
         </div>
       </div>
 
