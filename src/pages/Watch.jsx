@@ -8,8 +8,9 @@ import { CommentSection } from '@/components/comments'
 import { EmptyState, Button, Avatar } from '@/components/common'
 import { useHistoryStore } from '@/store'
 import { formatViews, formatRelativeTime, formatDuration } from '@/utils/formatters'
-import { AlertCircle, Clock, RotateCcw } from 'lucide-react'
+import { AlertCircle, Clock, RotateCcw, Save } from 'lucide-react'
 import { LikeDislikeButtons, SubscribeButton } from '@/components/video'
+import { AddToPlaylistModal } from '@/components/playlists'
 
 /**
  * Watch page: native video player, video details, recommended videos, comments.
@@ -34,6 +35,8 @@ export default function Watch() {
   const [resumeChoice, setResumeChoice] = useState(null) // 'resume' | 'over' | null
   const [resumeSeconds, setResumeSeconds] = useState(0)
   const [resumeDuration, setResumeDuration] = useState(0)
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [selectedVideoId, setSelectedVideoId] = useState(null)
 
   const videoElRef = useRef(null)
   const lastSaveRef = useRef(0)
@@ -227,6 +230,22 @@ export default function Watch() {
           </div>
         </div>
       )}
+      
+      {/* Save to playlist action */}
+      <div className="flex justify-end px-1">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedVideoId(video.id)
+            setAddModalOpen(true)
+          }}
+          className="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline"
+          aria-label="Add to playlist"
+        >
+          <Save className="w-3.5 h-3.5" />
+          <span>Save to playlist</span>
+        </button>
+      </div>
 
       {/* Player */}
       <section className="w-full">
@@ -278,6 +297,14 @@ export default function Watch() {
       <section className="w-full">
         <CommentSection videoId={video.id} />
       </section>
+      <AddToPlaylistModal
+        isOpen={addModalOpen}
+        onClose={() => {
+          setAddModalOpen(false)
+          setSelectedVideoId(null)
+        }}
+        videoId={selectedVideoId}
+      />
     </div>
   )
 }

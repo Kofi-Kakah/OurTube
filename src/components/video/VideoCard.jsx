@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import { MoreVertical, ListPlus, Share2 } from 'lucide-react'
@@ -10,6 +10,7 @@ import {
 import { Avatar, Dropdown, useToast } from '@/components/common'
 import { useHistoryStore } from '@/store'
 import { channels } from '@/data'
+import { AddToPlaylistModal } from '@/components/playlists'
 
 const channelLookup = new Map(channels.map((ch) => [ch.id, ch]))
 
@@ -25,6 +26,7 @@ function VideoCard({ video }) {
           (historyEntry.progressSeconds / historyEntry.durationSeconds) * 100
         )
       : 0)
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   const channel = channelLookup.get(video.channelId) || {
     name: 'Creator',
@@ -62,14 +64,12 @@ function VideoCard({ video }) {
   const handleAddToPlaylist = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    showToast({
-      message: 'Save to playlist will be available in Phase 9',
-      type: 'info',
-    })
+    setAddModalOpen(true)
   }
 
   return (
-    <article className="group flex flex-col gap-3 w-full">
+    <>
+      <article className="group flex flex-col gap-3 w-full">
       {/* Thumbnail Area */}
       <Link
         to={`/watch/${video.id}`}
@@ -190,6 +190,12 @@ function VideoCard({ video }) {
         </div>
       </div>
     </article>
+    <AddToPlaylistModal
+      isOpen={addModalOpen}
+      onClose={() => setAddModalOpen(false)}
+      videoId={video.id}
+    />
+    </>
   )
 }
 
