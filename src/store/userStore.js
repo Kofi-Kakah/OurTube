@@ -9,6 +9,9 @@ export const useUserStore = create(
       subscriptions: ['ch-1', 'ch-2', 'ch-9'], // Initial subscribed channels
       likedVideoIds: ['vid-1', 'vid-12', 'vid-17'], // Initial liked videos
       dislikedVideoIds: [],
+      autoplayDefault: true,
+      defaultPlaybackSpeed: 1,
+      defaultQuality: 'auto',
 
       subscribe: (channelId) => {
         set((state) => {
@@ -91,6 +94,18 @@ export const useUserStore = create(
         set((state) => ({
           user: { ...state.user, ...profileUpdates },
         }))
+      },
+
+      toggleAutoplay: () => {
+        set((state) => ({ autoplayDefault: !state.autoplayDefault }))
+      },
+
+      setPlaybackSpeed: (speed) => {
+        set({ defaultPlaybackSpeed: speed })
+      },
+
+      setDefaultQuality: (quality) => {
+        set({ defaultQuality: quality })
       },
     }),
     {
